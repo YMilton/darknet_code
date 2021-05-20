@@ -1,5 +1,7 @@
 #include "im2col.h"
 #include <stdio.h>
+
+// 卷积层的每次卷积操作可以堪称权重矩阵，与输入特征图转化成同权重矩阵同等大小矩阵的乘积运算
 float im2col_get_pixel(float* im, int height, int width, int channels,
     int row, int col, int channel, int pad)
 {
@@ -51,11 +53,13 @@ void im2col_cpu(float* data_im,
 // therefore its value is always lower than 0x800... where casting
 // negative value of a parameter converts it to value higher than 0x800...
 // The casting allows to use one condition instead of two.
+// 判断矩阵的某元素位置是否在pad上
 inline static int is_a_ge_zero_and_a_lt_b(int a, int b) {
     return (unsigned)(a) < (unsigned)(b); // unsigned强制转换负数，则为负数的补码
 }
 
 // https://github.com/BVLC/caffe/blob/master/src/caffe/util/im2col.cpp
+// im2col_cpu_ext的data_col表示的为[channels*ksize*ksize,h_out*w_out]
 void im2col_cpu_ext(const float* data_im, const int channels,
     const int height, const int width, const int kernel_h, const int kernel_w,
     const int pad_h, const int pad_w,
@@ -71,12 +75,14 @@ void im2col_cpu_ext(const float* data_im, const int channels,
     int channel, kernel_row, kernel_col, output_rows, output_col;
     // data_im表示某幅图像卷积时，某个组的开始位置
     for (channel = channels; channel--; data_im += channel_size) { // channels表示每个组的通道数
+        // 第二与第三个for循环体现输出矩阵的行数
         for (kernel_row = 0; kernel_row < kernel_h; kernel_row++) { // kernel尺寸
             for (kernel_col = 0; kernel_col < kernel_w; kernel_col++) {
-
+                // 找到卷积核的某一行在输入特征图中第一个元素的位置
                 int input_row = -pad_h + kernel_row * dilation_h; // pad_h = l.pad*l.dilation,此处l.pad=1
+                // 经过h_out*w_out个滑动窗口，第四个和第五个for循环体现了输出矩阵的列数
                 for (output_rows = output_h; output_rows; output_rows--) { // 输出尺寸
-                    // input_row<0或input>height的情况，height是输入图像的高
+                    // input_row<0或input_row>height的情况，height是输入图像的高
                     if (!is_a_ge_zero_and_a_lt_b(input_row, height)) { 
                         for (output_col = output_w; output_col; output_col--) {
                             *(data_col++) = 0; // data_col输出
