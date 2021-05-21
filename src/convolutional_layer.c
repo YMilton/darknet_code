@@ -1237,9 +1237,9 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
     {
         for (j = 0; j < l.groups; ++j)
         {
-            float *a = l.weights +j*l.nweights / l.groups;
-            float *b = state.workspace;
-            float *c = l.output +(i*l.groups + j)*n*m;
+            float *a = l.weights +j*l.nweights / l.groups; // 权重
+            float *b = state.workspace; // 输入特征图像值
+            float *c = l.output +(i*l.groups + j)*n*m; // 输出
 
             //gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
             //gemm_nn_custom(m, n, k, 1, a, k, b, n, c, n);
