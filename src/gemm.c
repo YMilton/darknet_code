@@ -106,7 +106,7 @@ void time_random_matrix(int TA, int TB, int m, int k, int n)
     free(c);
 }
 
-
+// TA,TB决定是否转置
 void gemm(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
         float *B, int ldb,
@@ -1972,17 +1972,18 @@ int is_avx() {
 int is_fma_avx2() {
     return 0;
 }
-
+// 卷积  前向时 A:权重，B:图像输入值，im2col后，C:输出
+// M: filters，K: ksize*ksize*input_channels, N:h_out*w_out
 void gemm_nn(int M, int N, int K, float ALPHA,
-    float *A, int lda,
-    float *B, int ldb,
-    float *C, int ldc)
+    float *A, int lda, // lda=K
+    float *B, int ldb, // ldb=N
+    float *C, int ldc) // ldc=N
 {
     int i, j, k;
     for (i = 0; i < M; ++i) {
         for (k = 0; k < K; ++k) {
             PUT_IN_REGISTER float A_PART = ALPHA * A[i * lda + k];
-            for (j = 0; j < N; ++j) {
+            for (j = 0; j < N; ++j) { // im2col的结果，行为K,列为N
                 C[i*ldc + j] += A_PART*B[k*ldb + j];
             }
         }
@@ -2580,6 +2581,24 @@ void convolution_repacked(uint32_t *packed_input, uint32_t *packed_weights, floa
     }
 }
 
+// 卷积  前向时 A:权重，B:图像输入值，im2col后，C:输出
+// M: filters，K: ksize*ksize*input_channels, N:h_out*w_out
+/*void gemm_nn(int M, int N, int K, float ALPHA,
+    float* A, int lda, // lda=K
+    float* B, int ldb, // ldb=N
+    float* C, int ldc) // ldc=N
+{
+    int i, j, k;
+    for (i = 0; i < M; ++i) {
+        for (k = 0; k < K; ++k) {
+            PUT_IN_REGISTER float A_PART = ALPHA * A[i * lda + k];
+            for (j = 0; j < N; ++j) { // im2col的结果，行为K,列为N
+                C[i * ldc + j] += A_PART * B[k * ldb + j];
+            }
+        }
+    }
+}*/
+
 // ALPHA=1 lda=ldb=h_out*w_out，C待更新权重,ld卷积核数值个数
 void gemm_nt(int M, int N, int K, float ALPHA,
         float *A, int lda, // A偏导
@@ -2631,7 +2650,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
-// gemm(0, 1, m, n, k, 1, a, k, b, k, 1, c, n);
+// TA，TB表示矩阵翻转(矩阵先上下，再左右调换顺序)
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
         float *B, int ldb,
