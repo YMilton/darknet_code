@@ -2580,19 +2580,20 @@ void convolution_repacked(uint32_t *packed_input, uint32_t *packed_weights, floa
     }
 }
 
+// ALPHA=1 lda=ldb=h_out*w_out，C待更新权重,ld卷积核数值个数
 void gemm_nt(int M, int N, int K, float ALPHA,
-        float *A, int lda,
-        float *B, int ldb,
-        float *C, int ldc)
+        float *A, int lda, // A偏导
+        float *B, int ldb, // B输入im2col结果
+        float *C, int ldc) // 更新权重
 {
     int i,j,k;
-    for(i = 0; i < M; ++i){
-        for(j = 0; j < N; ++j){
+    for(i = 0; i < M; ++i){ // M输出通道
+        for(j = 0; j < N; ++j){ // 卷积核权重个数
             PUT_IN_REGISTER float sum = 0;
-            for(k = 0; k < K; ++k){
+            for(k = 0; k < K; ++k){ // K=h_out*w_out
                 sum += ALPHA*A[i*lda+k]*B[j*ldb + k];
             }
-            C[i*ldc+j] += sum;
+            C[i*ldc+j] += sum; // 
         }
     }
 }
@@ -2630,7 +2631,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
     }
 }
 
-
+// gemm(0, 1, m, n, k, 1, a, k, b, k, 1, c, n);
 void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
         float *A, int lda,
         float *B, int ldb,
@@ -2654,12 +2655,13 @@ void gemm_cpu(int TA, int TB, int M, int N, int K, float ALPHA,
     else {
         int t;
         #pragma omp parallel for
+        // M特征图输出通道数
         for (t = 0; t < M; ++t) {
             if (!TA && !TB)
                 gemm_nn(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             else if (TA && !TB)
                 gemm_tn(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
-            else if (!TA && TB)
+            else if (!TA && TB) // (0,1) lda=ldb=h_out*w_out，C待更新权重,ld卷积核数值个数
                 gemm_nt(1, N, K, ALPHA, A + t*lda, lda, B, ldb, C + t*ldc, ldc);
             else
                 gemm_tt(1, N, K, ALPHA, A + t, lda, B, ldb, C + t*ldc, ldc);
