@@ -1385,7 +1385,7 @@ void forward_convolutional_layer(convolutional_layer l, network_state state)
                         b);                 // output
 
                 }
-
+                
                 gemm(0, 0, m, n, k, 1, a, k, b, n, 1, c, n);
                 // bit-count to float
             }
@@ -1560,12 +1560,12 @@ void backward_convolutional_layer(convolutional_layer l, network_state state)
 
     for (i = 0; i < l.batch; ++i) {
         for (j = 0; j < l.groups; ++j) {
-            // 指向输出某幅图像卷积后，某个组的开始位置
+            // 某个组上一层传递的偏导数开始位置
             float *a = l.delta + (i*l.groups + j)*m*k; // m=filters/groups表示每组通道数目,k=h*w
-            float *b = state.workspace;
-            float *c = l.weight_updates + j*l.nweights / l.groups;
+            float *b = state.workspace; // input通过im2col后的输出
+            float *c = l.weight_updates + j*l.nweights / l.groups; // 某个group下的卷积核的数字个数，c用以学习更新每个组的权重值
             // 指向某幅图像卷积时，某个组的开始位置
-            float *im = state.input + (i*l.groups + j)* (l.c / l.groups)*l.h*l.w; // l.c/l.groups表示输入时，每组通道的通道数
+            float *im = state.input + (i*l.groups + j)* (l.c / l.groups)*l.h*l.w; // l.c/l.groups表示输入时，每组的通道数
 
             //im2col_cpu(im, l.c / l.groups, l.h, l.w, l.size, l.stride, l.pad, b);
             im2col_cpu_ext(
@@ -1577,19 +1577,21 @@ void backward_convolutional_layer(convolutional_layer l, network_state state)
                 l.stride_y, l.stride_x, // stride (h, w)
                 l.dilation, l.dilation, // dilation (h, w)
                 b);                 // output
-
-            gemm(0, 1, m, n, k, 1, a, k, b, k, 1, c, n);
+            // m:特征图输出组通道数，n:卷积核组中权重个数，k:输出单通道数字个数
+            // a:某个组上一层传递的偏导数，b:输入特征图按卷积核im2col的结果，c:某个组中待更新的权重
+            gemm(0, 1, m, n, k, 1, a, k, b, k, 1, c, n); // 卷积核求导、卷积核权重值更新
 
             if (state.delta) {
-                a = l.weights + j*l.nweights / l.groups;
-                b = l.delta + (i*l.groups + j)*m*k;
-                c = state.workspace;
-
+                a = l.weights + j*l.nweights / l.groups; // 权重值
+                b = l.delta + (i*l.groups + j)*m*k; // 上一层传递的偏导数
+                c = state.workspace; // 输入数据的求导结果记录
+                // 输入数据求导
                 gemm(1, 0, n, k, m, 1, a, n, b, k, 0, c, k);
 
                 //col2im_cpu(state.workspace, l.c / l.groups, l.h, l.w, l.size, l.stride,
                 //     l.pad, state.delta + (i*l.groups + j)*l.c / l.groups*l.h*l.w);
-
+                
+                // col2im转化输入数据求导结果供上一层适用
                 col2im_cpu_ext(
                     state.workspace,        // input
                     l.c / l.groups,         // input channels (h, w)
