@@ -37,7 +37,7 @@ void im2col_cpu(float* data_im,
                 // 即输入图像按照ksize切去的像素块偏移量像素，与kernel中的某个权重对应
                 int im_row = h_offset + h * stride;  // 同核权重对应像素在输入图像的坐标计算
                 int im_col = w_offset + w * stride;
-                // ??
+                // 当只有一个通道时c=0，则col_index = h*width_col + w;
                 int col_index = (c * height_col + h) * width_col + w;
                 data_col[col_index] = im2col_get_pixel(data_im, height, width, channels,
                     im_row, im_col, c_im, pad);
